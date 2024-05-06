@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html ng-app="movies">
+  <head>
+    <meta charset="utf-8">
+    <title>Movies Recommendation Result</title>
+    <base href="/index.html">
+    <meta name = "viewport" content = "width=device-width, initial-scale = 1.0">
+    <meta name="keywords" content="docker-compose, docker, stack">
+    <meta name="author" content="Docker">
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+  </head>
+  <body ng-controller="statsCtrl" >
+    <div id="content-container">
+      <div id="content-container-center">
+        <h3>Recommended Movies</h3>
+        <ul>
+          <li ng-repeat="movie in movies">{{ movie.name }}</li>
+        </ul>
+        <div>Total votes: {{ totalVotes }}</div>
+      </div>
+    </div>
+    <script src="socket.io.js"></script>
+    <script src="angular.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
