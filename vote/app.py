@@ -9,6 +9,13 @@ import logging
 movies = ["Pulp Fiction", "The Shawshank Redemption", "Inception", "The Godfather", "Forrest Gump", 
           "The Matrix", "The Dark Knight", "Fight Club", "Interstellar", "The Lord of the Rings"]
 
+# New - Add user votes to Redis
+def add_user_votes(voter_id, votes):
+    redis = get_redis()
+    for vote in votes:
+        data = json.dumps({'voter_id': voter_id, 'vote': vote})
+        redis.rpush('votes', data)
+
 app = Flask(__name__)
 
 gunicorn_error_logger = logging.getLogger('gunicorn.error')
@@ -29,11 +36,9 @@ def hello():
     vote = None
 
     if request.method == 'POST':
-        redis = get_redis()
-        vote = request.form['vote']
-        app.logger.info('Received vote for %s', vote)
-        data = json.dumps({'voter_id': voter_id, 'vote': vote})
-        redis.rpush('votes', data)
+        vote = request.form.getlist('vote')
+        app.logger.info('Received votes for %s', vote)
+        add_user_votes(voter_id, vote)
 
     resp = make_response(render_template(
         'index.html',
@@ -44,7 +49,5 @@ def hello():
     resp.set_cookie('voter_id', voter_id)
     return resp
 
-
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=80, debug=True, threaded=True)
-

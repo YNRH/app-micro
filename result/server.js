@@ -47,7 +47,11 @@ function getVotes(client) {
       console.error("Error performing query: " + err);
     } else {
       var votes = collectVotesFromResult(result);
+      var movies = votes.movies.map(movie => movie.name);
+      // Emitting the list of movies to the users
       io.sockets.emit("votes", JSON.stringify(votes));
+      // Emitting the list of recommended movies
+      io.sockets.emit("recommendations", JSON.stringify(recommendations(movies)));
     }
 
     setTimeout(function() {getVotes(client) }, 1000);
@@ -69,6 +73,22 @@ function collectVotesFromResult(result) {
   return { movies: movies.slice(0, 4), totalVotes: totalVotes };
 }
 
+// Recommendations based on user votes
+function recommendations(userMovies) {
+  var userMoviesSet = new Set(userMovies);
+  var recommendations = [];
+  for (var user in users) {
+    var nearest = computeNearestNeighbor(user, users)[0][1];
+    var neighborRatings = users[nearest];
+    for (var movie in neighborRatings) {
+      if (!userMoviesSet.has(movie)) {
+        recommendations.push({ name: movie, score: neighborRatings[movie] });
+      }
+    }
+  }
+  return recommendations.sort((a, b) => b.score - a.score).slice(0, 4);
+}
+
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/views'));
@@ -81,3 +101,4 @@ server.listen(port, function () {
   var port = server.address().port;
   console.log('App running on port ' + port);
 });
+
