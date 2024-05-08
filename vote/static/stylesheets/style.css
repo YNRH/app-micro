@@ -34,14 +34,14 @@
   font-weight: 700;
   border: none;
   border-radius: 50%;
-  background-color: #548f77;
+  background-color: #52987cec;
   color: #fff;
   cursor: pointer;
   transition: background-color 0.3s;
 }
 
 .rating-button:hover {
-  background-color: #356652;
+  background-color: #306751ef;
 }
 
 #tip {
@@ -52,4 +52,22 @@
 #hostname {
   margin-top: 20px;
   font-size: 14px;
+}
+
+.selected {
+  background-color: #3c82bbea;
+  color: #fff;
+}
+
+.enviar-rating button {
+  margin: 20px;
+  padding: 10px 30px;
+  font-size: 16px;
+  font-weight: 700;
+  border: none;
+  border-radius: 5px;
+  background-color: #488d71ec;
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.3s;
 }

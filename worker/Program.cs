@@ -1,7 +1,5 @@
 // Worker/Program.cs
 using System;
-using System.Data.Common;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -21,10 +19,7 @@ namespace Worker
                 var redisConn = OpenRedisConnection("redis");
                 var redis = redisConn.GetDatabase();
 
-                var keepAliveCommand = pgsql.CreateCommand();
-                keepAliveCommand.CommandText = "SELECT 1";
-
-                var definition = new { vote = "", voter_id = "" };
+                var definition = new { movie = "", rating = "" };
                 while (true)
                 {
                     Thread.Sleep(100);
@@ -39,7 +34,7 @@ namespace Worker
                     if (json != null)
                     {
                         var vote = JsonConvert.DeserializeAnonymousType(json, definition);
-                        Console.WriteLine($"Processing vote for '{vote.vote}' by '{vote.voter_id}'");
+                        Console.WriteLine($"Processing vote for '{vote.movie}' with rating '{vote.rating}'");
                         // Reconnect DB if down
                         if (!pgsql.State.Equals(System.Data.ConnectionState.Open))
                         {
@@ -48,12 +43,8 @@ namespace Worker
                         }
                         else
                         { // Normal +1 vote requested
-                            UpdateVote(pgsql, vote.voter_id, vote.vote);
+                            UpdateVote(pgsql, vote.movie, vote.rating);
                         }
-                    }
-                    else
-                    {
-                        keepAliveCommand.ExecuteNonQuery();
                     }
                 }
             }
@@ -81,11 +72,6 @@ namespace Worker
                     Console.Error.WriteLine("Waiting for db");
                     Thread.Sleep(1000);
                 }
-                catch (DbException)
-                {
-                    Console.Error.WriteLine("Waiting for db");
-                    Thread.Sleep(1000);
-                }
             }
 
             Console.Error.WriteLine("Connected to db");
@@ -94,7 +80,8 @@ namespace Worker
             command.CommandText = @"CREATE TABLE IF NOT EXISTS votes (
                                         id SERIAL PRIMARY KEY,
                                         voter_id VARCHAR(255) NOT NULL,
-                                        vote VARCHAR(255) NOT NULL
+                                        movie VARCHAR(255) NOT NULL,
+                                        rating INT NOT NULL
                                     )";
             command.ExecuteNonQuery();
 
@@ -128,19 +115,19 @@ namespace Worker
                 .First(a => a.AddressFamily == AddressFamily.InterNetwork)
                 .ToString();
 
-        private static void UpdateVote(NpgsqlConnection connection, string voterId, string vote)
+        private static void UpdateVote(NpgsqlConnection connection, string movie, string rating)
         {
             var command = connection.CreateCommand();
             try
             {
-                command.CommandText = "INSERT INTO votes (voter_id, vote) VALUES (@voter_id, @vote)";
-                command.Parameters.AddWithValue("@voter_id", voterId);
-                command.Parameters.AddWithValue("@vote", vote);
+                command.CommandText = "INSERT INTO votes (movie, rating) VALUES (@movie, @rating)";
+                command.Parameters.AddWithValue("@movie", movie);
+                command.Parameters.AddWithValue("@rating", rating);
                 command.ExecuteNonQuery();
             }
             catch (DbException)
             {
-                command.CommandText = "UPDATE votes SET vote = @vote WHERE voter_id = @voter_id";
+                command.CommandText = "UPDATE votes SET rating = @rating WHERE movie = @movie";
                 command.ExecuteNonQuery();
             }
             finally
@@ -149,6 +136,4 @@ namespace Worker
             }
         }
     }
-}
-
 }

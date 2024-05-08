@@ -1,53 +1,91 @@
 <!-- vote/templates/index.html -->
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <title>Califica tus películas favoritas!</title>
-  <base href="/index.html">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="keywords" content="peliculas, calificaciones, votos">
-  <meta name="author" content="Tu equipo de desarrollo">
-  <link rel='stylesheet' href="{{ url_for('static',filename='stylesheets/style.css') }}" />
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
-</head>
-<body>
-<div id="content-container">
-  <div id="content-container-center">
-    <h2>Califica tus películas favoritas</h2>
-    <form id="choice" name='form' method="POST" action="/">
-      {% for movie in movies %}
-      <div class="movie">
-        <h4>{{ movie }}</h4>
-        <div class="rating-buttons">
-          <button type="submit" name="{{ movie }}" value="1" class="rating-button">1</button>
-          <button type="submit" name="{{ movie }}" value="2" class="rating-button">2</button>
-          <button type="submit" name="{{ movie }}" value="3" class="rating-button">3</button>
-          <button type="submit" name="{{ movie }}" value="4" class="rating-button">4</button>
-          <button type="submit" name="{{ movie }}" value="5" class="rating-button">5</button>
+  <head>
+    <meta charset="utf-8" />
+    <title>Califica tus películas favoritas!</title>
+    <base href="/index.html" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="keywords" content="peliculas, calificaciones, votos" />
+    <meta name="author" content="Tu equipo de desarrollo" />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static',filename='stylesheets/style.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css"
+    />
+  </head>
+  <body>
+    <div id="content-container">
+      <div id="content-container-center">
+        <h2>Califica tus películas favoritas</h2>
+        <form id="choice" name="form" method="POST" action="/">
+          {% for movie in movies %}
+          <div class="movie">
+            <h4>{{ movie }}</h4>
+            <div class="rating-buttons">
+              <button
+                type="button"
+                name="{{ movie }}"
+                value="1"
+                class="rating-button"
+              >
+                1
+              </button>
+              <button
+                type="button"
+                name="{{ movie }}"
+                value="2"
+                class="rating-button"
+              >
+                2
+              </button>
+              <button
+                type="button"
+                name="{{ movie }}"
+                value="3"
+                class="rating-button"
+              >
+                3
+              </button>
+              <button
+                type="button"
+                name="{{ movie }}"
+                value="4"
+                class="rating-button"
+              >
+                4
+              </button>
+              <button
+                type="button"
+                name="{{ movie }}"
+                value="5"
+                class="rating-button"
+              >
+                5
+              </button>
+            </div>
+          </div>
+          {% endfor %}
+          <div class="enviar-rating">
+            <button type="submit">Enviar</button>
+          </div>
+        </form>
+        <div id="tip">
+          (Seleccione una calificación del 1 al 5 para cada película)
         </div>
+        <div id="hostname">Procesado por el contenedor ID {{hostname}}</div>
       </div>
-      {% endfor %}
-    </form>
-    <div id="tip">
-      (Seleccione una calificación del 1 al 5 para cada película)
     </div>
-    <div id="hostname">
-      Procesado por el contenedor ID {{hostname}}
-    </div>
-  </div>
-</div>
-<script src="http://code.jquery.com/jquery-latest.min.js" type="text/javascript"></script>
-<script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.js"></script>
+    <script
+      src="http://code.jquery.com/jquery-latest.min.js"
+      type="text/javascript"
+    ></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.js"></script>
 
-{% if vote %}
-<script>
-  var vote = "{{vote}}";
+    <script src="{{ url_for('static', filename='scripts/main.js') }}"></script>
 
-  $(".movie[value='" + vote + "']").prop('disabled', true);
-  $(".movie[value='" + vote + "']").html('{{vote}} <i class="fa fa-check-circle"></i>');
-  $(".movie").not("[value='" + vote + "']").css('opacity','0.5');
-</script>
-{% endif %}
-</body>
+  </body>
 </html>

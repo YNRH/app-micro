@@ -10,12 +10,6 @@ import logging
 movies = ["Pulp Fiction", "The Shawshank Redemption", "Inception", "The Godfather", "Forrest Gump", 
           "The Matrix", "The Dark Knight", "Fight Club", "Interstellar", "The Lord of the Rings"]
 
-def add_user_votes(voter_id, votes):
-    redis = get_redis()
-    for vote in votes:
-        data = json.dumps({'voter_id': voter_id, 'vote': vote})
-        redis.rpush('votes', data)
-
 app = Flask(__name__)
 
 gunicorn_error_logger = logging.getLogger('gunicorn.error')
@@ -27,6 +21,12 @@ def get_redis():
         g.redis = Redis(host="redis", db=0, socket_timeout=5)
     return g.redis
 
+def add_user_votes(voter_id, votes):
+    redis = get_redis()
+    for movie, rating in votes.items():
+        data = json.dumps({'voter_id': voter_id, 'movie': movie, 'rating': rating})
+        redis.rpush('user_ratings', data)
+
 @app.route("/", methods=['POST','GET'])
 def hello():
     voter_id = request.cookies.get('voter_id')
@@ -36,9 +36,12 @@ def hello():
     vote = None
 
     if request.method == 'POST':
-        vote = [request.form.get(movie) for movie in movies]
+        vote = {movie: int(request.form.get(movie)) for movie in movies}
         app.logger.info('Received votes for %s', vote)
-        add_user_votes(voter_id, vote)
+        for movie, rating in vote.items():
+            data = json.dumps({'voter_id': voter_id, 'movie': movie, 'rating': rating})
+            redis = get_redis()
+            redis.rpush('user_ratings', data)
 
     resp = make_response(render_template(
         'index.html',
