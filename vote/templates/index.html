@@ -20,6 +20,7 @@
   <body>
     <div id="content-container">
       <div id="content-container-center">
+        <h1> User ID: <span>{{ voter_id}}</span> </h1>
         <h2>Califica tus películas favoritas</h2>
         <form id="choice" name="form" method="POST" action="/">
           {% for movie in movies %}
@@ -70,7 +71,7 @@
           </div>
           {% endfor %}
           <div class="enviar-rating">
-            <button type="submit">Enviar</button>
+            <button type="button" id="submit-btn">Enviar</button>
           </div>
         </form>
         <div id="tip">
@@ -86,6 +87,5 @@
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.js"></script>
 
     <script src="{{ url_for('static', filename='scripts/main.js') }}"></script>
-
   </body>
 </html>

@@ -1,5 +1,7 @@
 // Worker/Program.cs
 using System;
+using System.Data.Common;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -15,37 +17,58 @@ namespace Worker
         {
             try
             {
-                var pgsql = OpenDbConnection("Server=db;Username=postgres;Password=postgres;");
+                var pgsql = OpenDbConnection("Server=db;Username=postgres;Password=postgres;Database=DBmovies;");
                 var redisConn = OpenRedisConnection("redis");
                 var redis = redisConn.GetDatabase();
 
-                var definition = new { movie = "", rating = "" };
+                // Keep alive is not implemented in Npgsql yet. This workaround was recommended:
+                // https://github.com/npgsql/npgsql/issues/1214#issuecomment-235828359
+                var keepAliveCommand = pgsql.CreateCommand();
+                keepAliveCommand.CommandText = "SELECT 1";
+
                 while (true)
                 {
+                    // Slow down to prevent CPU spike, only query each 100ms
                     Thread.Sleep(100);
 
                     // Reconnect redis if down
-                    if (redisConn == null || !redisConn.IsConnected) {
+                    if (redisConn == null || !redisConn.IsConnected)
+                    {
                         Console.WriteLine("Reconnecting Redis");
                         redisConn = OpenRedisConnection("redis");
                         redis = redisConn.GetDatabase();
                     }
-                    string json = redis.ListLeftPopAsync("votes").Result;
-                    if (json != null)
+
+                    // Retrieve all keys from Redis matching the pattern "user_ratings:*"
+                    var keys = redis.Multiplexer.GetServer(redisConn.GetEndPoints()[0]).Keys(pattern: "user_ratings:*");
+
+                    foreach (var key in keys)
                     {
-                        var vote = JsonConvert.DeserializeAnonymousType(json, definition);
-                        Console.WriteLine($"Processing vote for '{vote.movie}' with rating '{vote.rating}'");
-                        // Reconnect DB if down
-                        if (!pgsql.State.Equals(System.Data.ConnectionState.Open))
+                        // Get user_id from the key
+                        var userId = key.ToString().Split(':')[1];
+
+                        // Get all fields and values from the hash
+                        var hashEntries = redis.HashGetAll(key);
+
+                        foreach (var hashEntry in hashEntries)
                         {
-                            Console.WriteLine("Reconnecting DB");
-                            pgsql = OpenDbConnection("Server=db;Username=postgres;Password=postgres;");
+                            var movie = hashEntry.Name.ToString();
+                            var ratingJson = hashEntry.Value.ToString();
+
+                            // Deserialize JSON to anonymous type
+                            var rating = JsonConvert.DeserializeAnonymousType(ratingJson, new { movie = "", rating = 0 });
+
+                            Console.WriteLine($"Processing rating for '{rating.movie}'");
+                            // Insert rating into PostgreSQL
+                            InsertRating(pgsql, userId, rating.movie, rating.rating);
                         }
-                        else
-                        { // Normal +1 vote requested
-                            UpdateVote(pgsql, vote.movie, vote.rating);
-                        }
+
+                        // After processing, remove the key from Redis
+                        redis.KeyDelete(key);
                     }
+
+                    // Execute keep alive command to prevent connection timeout
+                    keepAliveCommand.ExecuteNonQuery();
                 }
             }
             catch (Exception ex)
@@ -72,14 +95,25 @@ namespace Worker
                     Console.Error.WriteLine("Waiting for db");
                     Thread.Sleep(1000);
                 }
+                catch (DbException)
+                {
+                    Console.Error.WriteLine("Waiting for db");
+                    Thread.Sleep(1000);
+                }
             }
 
             Console.Error.WriteLine("Connected to db");
 
             var command = connection.CreateCommand();
-            command.CommandText = @"CREATE TABLE IF NOT EXISTS votes (
-                                        id SERIAL PRIMARY KEY,
-                                        voter_id VARCHAR(255) NOT NULL,
+            command.CommandText = @"CREATE TABLE IF NOT EXISTS users (
+                                        user_id SERIAL PRIMARY KEY,
+                                        voter_id VARCHAR(255) UNIQUE,
+                                        name VARCHAR(255)
+                                    );
+
+                                    CREATE TABLE IF NOT EXISTS ratings (
+                                        rating_id SERIAL PRIMARY KEY,
+                                        user_id INT REFERENCES users(user_id),
                                         movie VARCHAR(255) NOT NULL,
                                         rating INT NOT NULL
                                     )";
@@ -90,6 +124,7 @@ namespace Worker
 
         private static ConnectionMultiplexer OpenRedisConnection(string hostname)
         {
+            // Use IP address to workaround https://github.com/StackExchange/StackExchange.Redis/issues/410
             var ipAddress = GetIp(hostname);
             Console.WriteLine($"Found redis at {ipAddress}");
 
@@ -115,25 +150,61 @@ namespace Worker
                 .First(a => a.AddressFamily == AddressFamily.InterNetwork)
                 .ToString();
 
-        private static void UpdateVote(NpgsqlConnection connection, string movie, string rating)
+        private static void InsertRating(NpgsqlConnection connection, string userId, string movie, int rating)
         {
             var command = connection.CreateCommand();
             try
             {
-                command.CommandText = "INSERT INTO votes (movie, rating) VALUES (@movie, @rating)";
-                command.Parameters.AddWithValue("@movie", movie);
-                command.Parameters.AddWithValue("@rating", rating);
+                // Insert user if not exists
+                command.CommandText = "INSERT INTO users (voter_id) VALUES (@userId) ON CONFLICT (voter_id) DO NOTHING";
+                command.Parameters.AddWithValue("@userId", userId);
                 command.ExecuteNonQuery();
+
+                // Get user_id
+                command.CommandText = "SELECT user_id FROM users WHERE voter_id = @userId";
+                var userIdObj = command.ExecuteScalar();
+                int userIdInt = Convert.ToInt32(userIdObj);
+
+                // Check if the user has already rated the movie
+                command.CommandText = "SELECT COUNT(*) FROM ratings WHERE user_id = @userId AND movie = @movie";
+                command.Parameters.Clear();
+                command.Parameters.AddWithValue("@userId", userIdInt);
+                command.Parameters.AddWithValue("@movie", movie);
+                var existingRatingCount = Convert.ToInt32(command.ExecuteScalar());
+
+                if (existingRatingCount > 0)
+                {
+                    // If the user has already rated the movie, update the rating
+                    command.CommandText = "UPDATE ratings SET rating = @rating WHERE user_id = @userId AND movie = @movie";
+                    command.Parameters.Clear();
+                    command.Parameters.AddWithValue("@rating", rating);
+                    command.Parameters.AddWithValue("@userId", userIdInt);
+                    command.Parameters.AddWithValue("@movie", movie);
+                    command.ExecuteNonQuery();
+                }
+                else
+                {
+                    // If the user has not rated the movie before, insert a new rating
+                    command.CommandText = "INSERT INTO ratings (user_id, movie, rating) VALUES (@userId, @movie, @rating)";
+                    command.Parameters.Clear();
+                    command.Parameters.AddWithValue("@userId", userIdInt);
+                    command.Parameters.AddWithValue("@movie", movie);
+                    command.Parameters.AddWithValue("@rating", rating);
+                    command.ExecuteNonQuery();
+                }
             }
             catch (DbException)
             {
-                command.CommandText = "UPDATE votes SET rating = @rating WHERE movie = @movie";
-                command.ExecuteNonQuery();
+                // Handle duplicate ratings if necessary
+                Console.WriteLine($"Rating for '{movie}' already exists in the database.");
             }
             finally
             {
                 command.Dispose();
             }
         }
+
+
     }
 }
+

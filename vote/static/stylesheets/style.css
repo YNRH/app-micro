@@ -21,6 +21,12 @@
 .movie h4 {
   font-size: 22px;
 }
+h1{
+  font-size: 25px;
+}
+h1 span{
+  color: rgba(197, 185, 23, 0.925);
+}
 
 .rating-buttons {
   display: flex;
