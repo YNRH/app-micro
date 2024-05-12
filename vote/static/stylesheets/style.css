@@ -46,7 +46,7 @@ h1 span{
   transition: background-color 0.3s;
 }
 
-.rating-button:hover {
+.rating-button:hover, #submit-btn:hover {
   background-color: #306751ef;
 }
 

@@ -11,4 +11,4 @@ COPY . /app
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Run recommendation_service.py when the container launches
-CMD ["python", "app.py"]
+CMD ["python", "recommendation.py"]
