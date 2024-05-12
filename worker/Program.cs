@@ -111,10 +111,15 @@ namespace Worker
                                         name VARCHAR(255)
                                     );
 
+                                    CREATE TABLE IF NOT EXISTS movies (
+                                        movie_id SERIAL PRIMARY KEY,
+                                        movie VARCHAR(255) UNIQUE
+                                    );
+
                                     CREATE TABLE IF NOT EXISTS ratings (
                                         rating_id SERIAL PRIMARY KEY,
                                         user_id INT REFERENCES users(user_id),
-                                        movie VARCHAR(255) NOT NULL,
+                                        movie_id INT REFERENCES movies(movie_id),
                                         rating INT NOT NULL
                                     )";
             command.ExecuteNonQuery();
@@ -156,39 +161,62 @@ namespace Worker
             try
             {
                 // Insert user if not exists
-                command.CommandText = "INSERT INTO users (voter_id) VALUES (@userId) ON CONFLICT (voter_id) DO NOTHING";
+                command.CommandText = "INSERT INTO users (voter_id) VALUES (@userId) ON CONFLICT (voter_id) DO NOTHING RETURNING user_id";
                 command.Parameters.AddWithValue("@userId", userId);
-                command.ExecuteNonQuery();
-
-                // Get user_id
-                command.CommandText = "SELECT user_id FROM users WHERE voter_id = @userId";
                 var userIdObj = command.ExecuteScalar();
-                int userIdInt = Convert.ToInt32(userIdObj);
+                int userIdInt;
+                if (userIdObj == null)
+                {
+                    command.CommandText = "SELECT user_id FROM users WHERE voter_id = @userId";
+                    userIdObj = command.ExecuteScalar();
+                    userIdInt = Convert.ToInt32(userIdObj);
+                }
+                else
+                {
+                    userIdInt = Convert.ToInt32(userIdObj);
+                }
+
+                // Insert movie if not exists
+                command.CommandText = "INSERT INTO movies (movie) VALUES (@movie) ON CONFLICT (movie) DO NOTHING RETURNING movie_id";
+                command.Parameters.Clear();
+                command.Parameters.AddWithValue("@movie", movie);
+                var movieIdObj = command.ExecuteScalar();
+                int movieId;
+                if (movieIdObj == null)
+                {
+                    command.CommandText = "SELECT movie_id FROM movies WHERE movie = @movie";
+                    movieIdObj = command.ExecuteScalar();
+                    movieId = Convert.ToInt32(movieIdObj);
+                }
+                else
+                {
+                    movieId = Convert.ToInt32(movieIdObj);
+                }
 
                 // Check if the user has already rated the movie
-                command.CommandText = "SELECT COUNT(*) FROM ratings WHERE user_id = @userId AND movie = @movie";
+                command.CommandText = "SELECT COUNT(*) FROM ratings WHERE user_id = @userId AND movie_id = @movieId";
                 command.Parameters.Clear();
                 command.Parameters.AddWithValue("@userId", userIdInt);
-                command.Parameters.AddWithValue("@movie", movie);
+                command.Parameters.AddWithValue("@movieId", movieId);
                 var existingRatingCount = Convert.ToInt32(command.ExecuteScalar());
 
                 if (existingRatingCount > 0)
                 {
                     // If the user has already rated the movie, update the rating
-                    command.CommandText = "UPDATE ratings SET rating = @rating WHERE user_id = @userId AND movie = @movie";
+                    command.CommandText = "UPDATE ratings SET rating = @rating WHERE user_id = @userId AND movie_id = @movieId";
                     command.Parameters.Clear();
                     command.Parameters.AddWithValue("@rating", rating);
                     command.Parameters.AddWithValue("@userId", userIdInt);
-                    command.Parameters.AddWithValue("@movie", movie);
+                    command.Parameters.AddWithValue("@movieId", movieId);
                     command.ExecuteNonQuery();
                 }
                 else
                 {
                     // If the user has not rated the movie before, insert a new rating
-                    command.CommandText = "INSERT INTO ratings (user_id, movie, rating) VALUES (@userId, @movie, @rating)";
+                    command.CommandText = "INSERT INTO ratings (user_id, movie_id, rating) VALUES (@userId, @movieId, @rating)";
                     command.Parameters.Clear();
                     command.Parameters.AddWithValue("@userId", userIdInt);
-                    command.Parameters.AddWithValue("@movie", movie);
+                    command.Parameters.AddWithValue("@movieId", movieId);
                     command.Parameters.AddWithValue("@rating", rating);
                     command.ExecuteNonQuery();
                 }

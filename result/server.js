@@ -70,7 +70,11 @@ async.retry(
 // Función para obtener los votos de la base de datos
 function getVotes(client, voter_id) {
   client.query(
-    "SELECT r.movie, COUNT(*) AS count, AVG(r.rating) AS rating FROM ratings r INNER JOIN users u ON r.user_id = u.user_id WHERE u.voter_id = $1 GROUP BY r.movie ORDER BY rating DESC",
+    "SELECT m.movie, r.rating " +
+    "FROM ratings r " +
+    "INNER JOIN users u ON r.user_id = u.user_id " +
+    "INNER JOIN movies m ON r.movie_id = m.movie_id " +
+    "WHERE u.voter_id = $1 ORDER BY r.rating DESC",
     [voter_id],
     function (err, result) {
       if (err) {
@@ -105,7 +109,7 @@ function collectRatingsFromResult(result) {
       rating: parseFloat(row.rating),
     };
     ratings.movies.push(movie);
-    ratings.total += parseInt(row.count);
+    ratings.total += 1;
   });
 
   return ratings;
