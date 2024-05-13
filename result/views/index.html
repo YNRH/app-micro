@@ -9,7 +9,7 @@
     <meta name="author" content="Docker" />
     <link rel="stylesheet" href="/stylesheets/style.css" />
   </head>
-  <body ng-controller="statsCtrl">
+  <body ng-controller="moviesController">
     <div id="content-container">
       <h1>User ID: <span>{{voter_id}}</span></h1>
       <div id="result" class="subtitle">
@@ -25,12 +25,21 @@
         </div>
       </div>
       <div id="recommendation" class="subtitle">
-        <h2>Películas Recomendadas</h2>
+        <h2>Películas Recomendadas</h2><span>{{total_recomendadas}}</span>
+        <div id="content-container-center">
+          <div id="choice">
+            <div class="movie" ng-repeat="recomendacion in recomendaciones">
+              <div class="label">{{recomendacion[0]}}</div>
+              <div class="stat">{{recomendacion[1]}}</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <script src="socket.io.js"></script>
     <script src="angular.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

@@ -24,10 +24,10 @@ services:
     build: ./result
     entrypoint: nodemon --inspect=0.0.0.0 server.js
     depends_on:
-      db:
-        condition: service_healthy
-      recommendation:
-        condition: service_healthy
+      - db
+      - api
+    environment:
+      - API_URL=http://api:80
     volumes:
       - ./result:/usr/local/app
     ports:
@@ -48,7 +48,7 @@ services:
     networks:
       - back-tier
 
-  recommendation:
+  api:
     build:
       context: ./recommendation
     depends_on:

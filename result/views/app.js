@@ -1,28 +1,37 @@
 var app = angular.module("moviesApp", []);
 var socket = io.connect();
 
-app.controller("statsCtrl", function ($scope) {
-  $scope.movies = [];
-  $scope.total = 0;
-  $scope.rating = 0;
-  // Mostrar el voter_id en el título
-  $scope.voter_id = getCookie("voter_id");
+app.controller("moviesController", function ($scope, $http) {
+  // Define API_URL
+  //$scope.API_URL = 'http://api:5002';
 
-  // Función para obtener un cookie por nombre
+  var init = function () {
+    document.body.style.opacity = 1;
+  };
+  socket.on("message", function (data) {
+    init();
+  });
+
+  // Función para obtener la cookie "voter_id" del navegador
   function getCookie(name) {
-    var match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
-    if (match) return match[2];
+    var value = "; " + document.cookie;
+    var parts = value.split("; " + name + "=");
+    if (parts.length == 2) return parts.pop().split(";").shift();
   }
 
-  socket.on("scores", function (json) {
-    var data = JSON.parse(json);
-    $scope.movies = data.movies;
-    $scope.total = data.total;
-    $scope.rating = data.rating;
-    $scope.$apply();
-  });
+  // Obtener el voter_id
+  $scope.voter_id = getCookie("voter_id");
 
-  socket.on("message", function (data) {
-    document.body.style.opacity = 1;
-  });
+  // Obtener las recomendaciones para el usuario
+  if ($scope.voter_id) {
+    $http.get('http://localhost:5002/recommendations/' + $scope.voter_id)
+    .then(function (response) {
+      console.log('Datos de respuesta de la API:', response.data);
+      $scope.recomendaciones = response.data;
+      $scope.total_recomendadas = response.data.length;
+    })
+    .catch(function (error) {
+      console.log('Error al obtener recomendaciones:', error);
+    });
+  }
 });
